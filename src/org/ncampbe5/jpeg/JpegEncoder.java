@@ -137,17 +137,13 @@ class JpegEncoder extends Frame {
 				xpos = c * 8;
 				ypos = r * 8;
 				for (comp = 0; comp < JpegObj.NumberOfComponents; comp++) {
-					// Width = JpegObj.BlockWidth[comp];
-					// Height = JpegObj.BlockHeight[comp];
 					inputArray = (float[][]) JpegObj.Components[comp];
-
 					for (i = 0; i < JpegObj.VsampFactor[comp]; i++) {
 						for (j = 0; j < JpegObj.HsampFactor[comp]; j++) {
 							xblockoffset = j * 8;
 							yblockoffset = i * 8;
 							for (a = 0; a < 8; a++) {
 								for (b = 0; b < 8; b++) {
-
 									// I believe this is where the dirty line at
 									// the bottom of
 									// the image is coming from.
@@ -156,29 +152,14 @@ class JpegEncoder extends Frame {
 									// image data.
 									// This seems to not be a big issue right
 									// now. (04/04/98)
-
 									dctArray1[a][b] = inputArray[ypos
 											+ yblockoffset + a][xpos
 											+ xblockoffset + b];
 								}
 							}
-							// The following code commented out because on some
-							// images this
-							// technique
-							// results in poor right and bottom borders.
-							// if ((!JpegObj.lastColumnIsDummy[comp] || c <
-							// Width - 1) &&
-							// (!JpegObj.lastRowIsDummy[comp] || r < Height -
-							// 1)) {
 							dctArray2 = dct.forwardDCT(dctArray1);
 							dctArray3 = dct.quantizeBlock(dctArray2,
 									JpegObj.QtableNumber[comp]);
-							// }
-							// else {
-							// zeroArray[0] = dctArray3[0];
-							// zeroArray[0] = lastDCvalue[comp];
-							// dctArray3 = zeroArray;
-							// }
 							Huf.HuffmanBlockEncoder(outStream, dctArray3,
 									lastDCvalue[comp],
 									JpegObj.DCtableNumber[comp],
