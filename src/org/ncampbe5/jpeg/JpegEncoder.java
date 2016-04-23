@@ -92,7 +92,10 @@ class JpegEncoder extends Frame {
 
 	public void Compress() {
 		WriteHeaders(outStream);
+		long startTime = System.currentTimeMillis();
 		WriteCompressedData(outStream);
+		long endTime = System.currentTimeMillis();
+		System.out.println("WriteCompressedData time = " + (endTime-startTime) + " ms.");
 		WriteEOI(outStream);
 		try {
 			outStream.flush();
@@ -114,11 +117,7 @@ class JpegEncoder extends Frame {
 		 * upper left of the image, it compresses 8x8 blocks of data until the
 		 * entire image has been compressed.
 		 */
-
 		int lastDCvalue[] = new int[JpegObj.NumberOfComponents];
-		// int zeroArray[] = new int[64]; // initialized to hold all zeros
-		// int Width = 0, Height = 0;
-		// int nothing = 0, not;
 		int MinBlockWidth, MinBlockHeight;
 		// This initial setting of MinBlockWidth and MinBlockHeight is done to
 		// ensure they start with values larger than will actually be the case.
@@ -128,9 +127,18 @@ class JpegEncoder extends Frame {
 				.floor(imageHeight / 8.0) + 1) * 8 : imageHeight);
 		for (comp = 0; comp < JpegObj.NumberOfComponents; comp++) {
 			MinBlockWidth = Math.min(MinBlockWidth, JpegObj.BlockWidth[comp]);
-			MinBlockHeight = Math
-					.min(MinBlockHeight, JpegObj.BlockHeight[comp]);
+			MinBlockHeight = Math.min(MinBlockHeight, JpegObj.BlockHeight[comp]);
 		}
+		System.out.println("MinBlockHeight = " + MinBlockHeight);
+		System.out.println("MinBlockHeight = " + MinBlockWidth);
+		System.out.println("JpegObj.HsampFactor[0] = " + JpegObj.HsampFactor[0]);
+		System.out.println("JpegObj.NumberOfComponents = " + JpegObj.NumberOfComponents);
+		System.out.println("JpegObj.HsampFactor[0] = " + JpegObj.HsampFactor[0]);
+		System.out.println("JpegObj.VsampFactor[0] = " + JpegObj.VsampFactor[0]);
+		System.out.println("JpegObj.HsampFactor[1] = " + JpegObj.HsampFactor[1]);
+		System.out.println("JpegObj.VsampFactor[1] = " + JpegObj.VsampFactor[1]);
+		System.out.println("JpegObj.HsampFactor[2] = " + JpegObj.HsampFactor[2]);
+		System.out.println("JpegObj.VsampFactor[2] = " + JpegObj.VsampFactor[2]);
 		xpos = 0;
 		for (r = 0; r < MinBlockHeight; r++) {
 			for (c = 0; c < MinBlockWidth; c++) {
@@ -144,26 +152,13 @@ class JpegEncoder extends Frame {
 							yblockoffset = i * 8;
 							for (a = 0; a < 8; a++) {
 								for (b = 0; b < 8; b++) {
-									// I believe this is where the dirty line at
-									// the bottom of
-									// the image is coming from.
-									// I need to do a check here to make sure
-									// I'm not reading past
-									// image data.
-									// This seems to not be a big issue right
-									// now. (04/04/98)
-									dctArray1[a][b] = inputArray[ypos
-											+ yblockoffset + a][xpos
-											+ xblockoffset + b];
+									dctArray1[a][b] = inputArray[ypos + yblockoffset + a][xpos + xblockoffset + b];
 								}
 							}
 							dctArray2 = dct.forwardDCT(dctArray1);
-							dctArray3 = dct.quantizeBlock(dctArray2,
-									JpegObj.QtableNumber[comp]);
-							Huf.HuffmanBlockEncoder(outStream, dctArray3,
-									lastDCvalue[comp],
-									JpegObj.DCtableNumber[comp],
-									JpegObj.ACtableNumber[comp]);
+							dctArray3 = dct.quantizeBlock(dctArray2, JpegObj.QtableNumber[comp]);
+							
+							Huf.HuffmanBlockEncoder(outStream, dctArray3, lastDCvalue[comp], JpegObj.DCtableNumber[comp], JpegObj.ACtableNumber[comp]);
 							lastDCvalue[comp] = dctArray3[0];
 						}
 					}
