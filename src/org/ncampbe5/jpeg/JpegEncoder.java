@@ -6,6 +6,8 @@ import java.awt.MediaTracker;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 //Version 1.0a
 //Copyright (C) 1998, James R. Weeks and BioElectroMech.
@@ -132,13 +134,86 @@ class JpegEncoder extends Frame {
 		System.out.println("MinBlockHeight = " + MinBlockHeight);
 		System.out.println("MinBlockHeight = " + MinBlockWidth);
 		System.out.println("JpegObj.HsampFactor[0] = " + JpegObj.HsampFactor[0]);
-		System.out.println("JpegObj.NumberOfComponents = " + JpegObj.NumberOfComponents);
-		System.out.println("JpegObj.HsampFactor[0] = " + JpegObj.HsampFactor[0]);
-		System.out.println("JpegObj.VsampFactor[0] = " + JpegObj.VsampFactor[0]);
-		System.out.println("JpegObj.HsampFactor[1] = " + JpegObj.HsampFactor[1]);
-		System.out.println("JpegObj.VsampFactor[1] = " + JpegObj.VsampFactor[1]);
-		System.out.println("JpegObj.HsampFactor[2] = " + JpegObj.HsampFactor[2]);
-		System.out.println("JpegObj.VsampFactor[2] = " + JpegObj.VsampFactor[2]);
+		System.out.println("JpegObj.NumberOfComponents = " + JpegObj.NumberOfComponents);		
+		
+		class TransformAndQuantizeThread extends Thread {
+			private int row, col, comp;
+			private float dct1[][] = new float[8][8];
+			private double dct2[][] = new double[9][9];
+			private int dct3[] = new int[8*8];
+			private float inputArray[][];
+			private boolean done = false;
+			
+			public TransformAndQuantizeThread(int row, int col, int comp) {
+				super("TransformAndQuantizeThread");
+				this.row = row;
+				this.col = col;
+				this.comp = comp;
+			}
+			
+			public void run() {
+				int xpos = col * 8;
+				int ypos = row * 8;
+				int xblockoffset, yblockoffset;
+				inputArray = (float[][]) JpegObj.Components[comp];
+				for (int i = 0; i < JpegObj.VsampFactor[comp]; i++) {
+					for (int j = 0; j < JpegObj.HsampFactor[comp]; j++) {
+						xblockoffset = j * 8;
+						yblockoffset = i * 8;
+						for (int a = 0; a < 8; a++) {
+							for (int b = 0; b < 8; b++) {
+								dct1[a][b] = inputArray[ypos + yblockoffset + a][xpos + xblockoffset + b];
+							}
+						}
+						dct2 = dct.forwardDCT(dct1);
+						dct3 = dct.quantizeBlock(dct2, JpegObj.QtableNumber[comp]);
+					}
+				}
+				done = true;
+			}
+
+			public int[] getDct3() {
+				return dct3;
+			}
+
+			public boolean isDone() {
+				return done;
+			}
+			
+			public int getComp() {
+				return comp;
+			}
+			
+		}
+		
+		List<TransformAndQuantizeThread> workerThreads = new ArrayList<TransformAndQuantizeThread>();
+		for (r = 0; r < MinBlockHeight; r++) {
+			for (c = 0; c < MinBlockWidth; c++) {
+				for (comp = 0; comp < JpegObj.NumberOfComponents; comp++) {
+					TransformAndQuantizeThread t = new TransformAndQuantizeThread(r, c, comp);
+					workerThreads.add(t);
+					t.start();
+				}
+			}
+		}
+		
+		int idx = 0;
+		while (idx < workerThreads.size()) { // TODO: get rid of busy wait
+			TransformAndQuantizeThread t = workerThreads.get(idx);
+			try {
+				t.join();
+				long startTime = System.nanoTime();
+				Huf.HuffmanBlockEncoder(outStream, t.getDct3(), lastDCvalue[t.getComp()], JpegObj.DCtableNumber[t.getComp()], JpegObj.ACtableNumber[t.getComp()]);
+				lastDCvalue[t.getComp()] = t.getDct3()[0];
+				long endTime = System.nanoTime();
+				System.out.println("HuffmanBlockEncoder time = " + (endTime-startTime) + " ns.");
+				idx++;
+			} catch (InterruptedException ie) {
+				System.out.println("Interrupted");
+			}
+		}
+		/*
+		
 		xpos = 0;
 		for (r = 0; r < MinBlockHeight; r++) {
 			for (c = 0; c < MinBlockWidth; c++) {
@@ -155,16 +230,24 @@ class JpegEncoder extends Frame {
 									dctArray1[a][b] = inputArray[ypos + yblockoffset + a][xpos + xblockoffset + b];
 								}
 							}
+							long startTime = System.nanoTime();
 							dctArray2 = dct.forwardDCT(dctArray1);
 							dctArray3 = dct.quantizeBlock(dctArray2, JpegObj.QtableNumber[comp]);
+							long endTime = System.nanoTime();
+							System.out.println("DCT and Quantize time = " + (endTime-startTime) + " ns.");
 							
+							startTime = System.nanoTime();
 							Huf.HuffmanBlockEncoder(outStream, dctArray3, lastDCvalue[comp], JpegObj.DCtableNumber[comp], JpegObj.ACtableNumber[comp]);
 							lastDCvalue[comp] = dctArray3[0];
+							endTime = System.nanoTime();
+							System.out.println("HuffmanBlockEncoder time = " + (endTime-startTime) + " ns.");
 						}
 					}
 				}
 			}
 		}
+		*/
+		
 		Huf.flushBuffer(outStream);
 	}
 
